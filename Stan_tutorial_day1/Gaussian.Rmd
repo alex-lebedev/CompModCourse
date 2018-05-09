@@ -1,0 +1,153 @@
+---
+title: "Fitting a Gaussian"
+output: html_notebook
+---
+
+
+In this simple example we fit a Gaussian distribution to some data, and we estimate the distribution for the mean and sd of the Gaussian. 
+
+```{r, echo = F}
+rm(list=ls()) # clears workspace
+library(rstan)
+```
+
+
+# Set up the model
+Normally defined in a separate file, but for simple models it can be done in a string within the R script.
+
+Model 1
+```{r, echo = F}
+model.1 <- "
+// Inferring the Mean and Standard Deviation of a Gaussian
+	data {
+		int<lower=1> N; // number of observations
+		real y[N];
+	}
+
+	parameters {
+		real mu; // mean
+		real<lower=0> sigma; // sd
+	}
+
+	model {
+    for (i in 1:N)
+		  y[i] ~ normal(mu, sigma);	// likelihood
+									                
+    mu ~ normal(0, 100);        
+    sigma ~ cauchy(0, 100);
+	}		
+"
+	
+```
+
+Model 2
+```{r, echo = F}
+
+model.2 <- "
+// Inferring the Mean and Standard Deviation of a Gaussian
+data { 
+  int<lower=1> N; // number of observations
+  vector[N] y;     
+}
+
+parameters {
+  real mu;
+  real<lower=0> sigma; 
+} 
+
+model {
+  y ~ normal(mu, sigma); // likelihood, vectorized statement
+
+  mu ~ normal(0, 100);        
+  sigma ~ cauchy(0, 100);
+}"
+```
+
+
+# Create some data
+```{r}
+
+mu <- 10
+sigma <- 5
+N <- 50
+y <- rnorm(N, mu, sigma)
+
+# check the data
+hist(y, 20)
+
+# data to be passed on to Stan
+data <- list(y=y, N=N) 
+
+```
+
+# Estimating the model
+
+Call the stan function to estimate the model. 
+
+```{r}
+
+# initialization (not always necessary)
+myinits <- list(
+  list(mu=0, sigma=1)
+  )
+
+# parameters to be monitored: 
+parameters <- c("mu", "sigma")
+
+myfit <- stan(model_code=model.1,   
+                data=data, 
+                init=myinits,  # If not specified, gives random inits
+                pars=parameters,
+                iter=1000, 
+                chains=1, 
+                # warmup = 100,  # Default = iter/2
+                # seed = 123  # Setting seed; Default is random seed
+                )
+
+```
+
+# Inspecting the results
+The object 'myfit', returned from function stan is an object of class stanfit. You can use methods such as print and plot to access the results in 'myfit'. 
+
+
+```{r}
+print(myfit)
+plot(myfit, ci_level = 0.8, outer_level = 0.95) 
+
+
+```
+
+
+# Getting the samples
+You can extract the samples for each parameter:
+
+```{r}
+mu <- extract(myfit)$mu
+sigma <- extract(myfit)$sigma 
+
+myparameters = data.frame(mu = mu, sigma = sigma)
+print(myparameters)
+
+# plot these parameters
+pairs(myparameters) # not the same method as for the 'myfit object'!
+
+hist(mu, 100)
+hist(sigma, 100)
+
+```
+
+
+
+# Exercises
+
+- Generate data from a Gaussian with arbitrary mean and sd, fit the model and compare the estimated parameters with the true ones. 
+
+- Repeat a couple of times (without changing the data) and see how much the results vary.
+
+- What is the effect of changing the amount of observations (N)?
+
+- Run both models. Which one runs faster?
+
+- What is the effect of replacing the current informative priors by uniform ones? 
+
+- What happens if you use a very narrow prior around zero in the cases of many (N ~ 1000) and few (N ~ 10) observations? 

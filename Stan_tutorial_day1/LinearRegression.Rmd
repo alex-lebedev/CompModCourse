@@ -1,0 +1,157 @@
+---
+title: "Multiple linear regression"
+output: html_notebook
+---
+
+We generate some data from a linear model and try to infer the parameters. 
+
+
+```{r, echo = F}
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Create some data
+
+```{r}
+
+N = 100 # number of observations
+M = 5 # number of regressors
+
+X = matrix(rnorm(N*M), N, M) # create matrix of regressors
+
+beta <- rnorm(M + 1) # create regression coefficients, adding intercept
+sigma = 1 # noise sd
+
+y = as.numeric(cbind(1, X) %*% beta + sigma*rnorm(N)) # create some data, first column is the intercept
+data <- list(N = N, M = M, X = X, y = y) 
+
+# print the coefficients
+print(beta)
+
+```
+
+
+# Estimating the model
+
+
+```{r}
+
+# parameters to be monitored: 
+parameters <- c("beta", "sigma")
+
+mysamples <- stan(file='stan_models/linear_regression.stan',   
+                data=data, 
+#                pars=parameters,
+                iter=2000, 
+                chains=4, 
+                thin=1
+                )
+
+```
+
+
+# Inspecting the results
+
+```{r}
+print(mysamples)
+plot(mysamples)
+
+```
+
+
+# Getting the samples
+
+```{r}
+pairs(mysamples, pars = parameters)
+traceplot(mysamples, pars = parameters)
+
+```
+
+
+# Exercises
+
+- Compare the true and estimated coefficients (e.g. plot mean posterior estimates vs true). 
+
+- Change the priors to more informative ones. What happens when you use priors that are very narrow around zero? 
+
+- Create a new matrix of regressors X_new and pass it to Stan, in addition to the matrix X. Generate a predicted y_new from X_new and the parameter values estimated using X and y. Use the 'generated quantities' program block.    
+
+
+
+# Highly correlated regressors
+
+We look at the case where there is high correlation between two of the regressors. 
+
+```{r}
+library(MASS)
+
+N = 100 # number of observations
+M = 3 # number of regressors
+
+# We create a data matrix with two highly correlated regressors 
+mu <- rep(0,3)
+Cov <- matrix(c(1, 0.8, -0.2, 0.8, 1, 0.1, -0.2, 0.1, 1), 3, 3)
+ 
+X <- mvrnorm(n=N, mu=mu, Sigma=Cov)
+
+beta <- rnorm(M + 1) # create regression coefficients, adding intercept
+sigma = 1 # noise sd
+
+y = as.numeric(cbind(1, X) %*% beta + sigma*rnorm(N)) # create some data, first column is the intercept
+data <- list(N = N, M = M, X = X, y = y) 
+
+# print out correlation of regressors and coefficients
+print(cor(X))
+
+print(beta)
+
+```
+
+# Estimating the model
+
+```{r}
+
+# parameters to be monitored: 
+parameters <- c("beta", "sigma")
+
+mysamples <- stan(file='stan_models/linear_regression.stan',   
+                data=data, 
+                pars=parameters,
+                iter=2000, 
+                chains=4, 
+                thin=1
+                )
+
+```
+
+
+# Inspecting the results
+
+```{r}
+print(mysamples)
+plot(mysamples)
+
+```
+
+# Plotting the samples
+Observe the correlation in the posterior of the coefficients.
+
+```{r}
+pairs(mysamples, pars = c("beta"))
+```
+
+
+# Exercises
+
+- What happens when you use priors that are very narrow around zero? 
+
+
+- Based on this model of linear regression, implement logistic and probit regression models:
+  - Create a model with random coefficients and generate some data.
+  - Modify the .stan script.
+  - Estimate the model and check that the coefficients are inferred correctly.
+

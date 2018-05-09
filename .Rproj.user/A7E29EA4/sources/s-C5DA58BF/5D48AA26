@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1525858000201.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "766523009",
+    "id" : "5D48AA26",
+    "lastKnownWriteTime" : 1525617922,
+    "last_content_update" : 1525617922,
+    "path" : "~/GitHub/CompModCourse/Stan_tutorial_day1/LinearRegression.Rmd",
+    "project_path" : "Stan_tutorial_day1/LinearRegression.Rmd",
+    "properties" : {
+        "chunk_output_type" : "inline"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
