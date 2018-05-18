@@ -113,7 +113,7 @@ genInitList = function(){
 adapt_delta   = 0.95
 stepsize      = 1
 max_treedepth = 10
-nchain        = 4
+nchain        = 1
 nthin         = 1
 niter         = 3000
 nwarmup       = 1000
@@ -123,7 +123,7 @@ nthin         = 1
 
 myfit <- stan(file = "stan_models/choiceRT_ddm.stan",
                   data   = dataList, 
-                  pars   = parameters,
+      #           pars   = parameters,
                   warmup = nwarmup,
                   init   = genInitList, 
                   iter   = niter, 
@@ -139,7 +139,7 @@ myfit <- stan(file = "stan_models/choiceRT_ddm.stan",
 ```{r}
 
 # Load previous fit
-# load('results/drift_diffusion3000.RData')
+# load('/Users/alebedev/GitHub/CompModCourse/Day3/Stan_tutorial_day3/results/drift_diffusion3000.RData')
 
 
 ## Extract parameters

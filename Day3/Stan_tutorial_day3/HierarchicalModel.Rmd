@@ -25,12 +25,12 @@ input_data <- list(J = 8,
 
 # Estimate the model
 ```{r}
-fit_cp <- stan(file='stan_models/eight_schools_cp.stan', data=input_data,
+fit_cp <- stan(file='/Users/alebedev/GitHub/CompModCourse/Day2/Stan_tutorial_day2/stan_models/eight_schools_cp.stan', data=input_data,
                  iter=2000, 
                  warmup=1000, 
                  chains=4, 
                  seed=11,
-                 control=list(adapt_delta=0.8)
+                 control=list(adapt_delta=0.99)
                  )
 
 ``````
