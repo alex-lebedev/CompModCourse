@@ -1,0 +1,148 @@
+---
+title: "Two-arm bandit task"
+output: html_notebook
+---
+
+
+A model for the two-arm bandit task (e.g. Chowdhury et al. 2013). 
+
+```{r, echo = F}
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Load some data
+
+```{r}
+#definitions
+data_file = 'data/bandit2arm_exampleData.txt'
+
+rawdata <- read.table( data_file, header = T, sep="\t")
+
+# Individual Subjects
+subjList <- unique(rawdata[,"subjID"])  # list of subjects x blocks
+numSubjs <- length(subjList)  # number of subjects
+
+# Specify the number of parameters and parameters of interest 
+numPars <- 2
+parameters <- c("mu_A", 
+                "mu_tau", 
+                "sigma",
+                "A", "tau", 
+                "log_lik")
+
+```
+
+# Organize and visualize 
+
+```{r}
+
+Tsubj <- as.vector( rep( 0, numSubjs ) ) # number of trials for each subject
+
+for ( i in 1:numSubjs )  {
+  curSubj  <- subjList[ i ]
+  Tsubj[i] <- sum( rawdata$subjID == curSubj )  # Tsubj[N]
+}
+
+# Setting maxTrials
+maxTrials <- max(Tsubj)
+
+choice  <- array(1, c(numSubjs, maxTrials) )
+outcome <- array(0, c(numSubjs, maxTrials) )
+
+for (i in 1:numSubjs) {
+  curSubj      <- subjList[i]
+  useTrials    <- Tsubj[i]
+  tmp          <- subset(rawdata, rawdata$subjID == curSubj)
+  choice[i, 1:useTrials] <- tmp$choice
+  outcome[i, 1:useTrials] <- tmp$outcome
+}
+
+dataList <- list(
+  N        = numSubjs,
+  T        = maxTrials,
+  Tsubj    = Tsubj,
+  choice   = choice,
+  outcome  = outcome,
+  numPars  = numPars
+)
+```
+
+# Parameter estimation
+
+```{r}
+
+# Set sampler parameters
+adapt_delta   = 0.95
+stepsize      = 1
+max_treedepth = 10
+nchain        = 4
+nthin         = 1
+niter         = 3000
+nwarmup       = 1000
+nthin         = 1
+
+# Estimation
+
+myfit <- stan(file = "stan_models/bandit_2arm.stan",
+                  data   = dataList, 
+                  pars   = parameters,
+                  warmup = nwarmup,
+#                  init   = genInitList, 
+                  iter   = niter, 
+                  chains = nchain,
+                  thin   = nthin,
+                  control = list(adapt_delta   = adapt_delta, 
+                                 max_treedepth = max_treedepth, 
+                                 stepsize      = stepsize) )
+```
+
+# Extract parameters
+
+```{r}
+
+# load('results/bandit_2arm.RData')
+
+
+## Extract parameters
+parVals <- extract(myfit, permuted=T)
+
+A   <- parVals$A
+tau  <- parVals$tau  
+
+allIndPars <- array(NA, c(numSubjs, numPars))
+allIndPars <- as.data.frame(allIndPars)
+
+for (i in 1:numSubjs) {
+    allIndPars[i, ] <- c( mean(A[, i]), 
+                          mean(tau[, i]) )
+}
+
+allIndPars           <- cbind(allIndPars, subjList)
+colnames(allIndPars) <- c("A", 
+                          "tau", 
+                          "subjID")
+
+```
+
+```{r}
+# Save the fit
+# save(myfit, file = 'results/bandit_2arm.RData')
+
+```
+
+# Exercises
+
+- Why are we using a categorical instead of bernoulli likelihood?
+
+- The outcomes (rewards) can be -1 or 1. If you change the rewards to e.g. [-10, 10], or [-5, 10], how do you need to adjust the model?
+
+- Compare (plot) the action selection function for the two subjects whose actions follow their internal value representation most stochastically and most deterministically, respectively.
+
+- Generate and plot the time series of expected values for one subject.
+
+- Write the model for a 4-arm bandit. You can test it with the dataset in the data/bandit4arm_exampleData.txt.
+

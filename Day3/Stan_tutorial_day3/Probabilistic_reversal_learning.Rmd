@@ -1,0 +1,214 @@
+---
+title: "Probabilistic reversal learning"
+output: html_notebook
+---
+
+
+```{r, echo = F}
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Load some data
+
+```{r}
+#definitions
+data_file = 'data/prl_exampleData.txt'
+
+rawdata <- read.table( data_file, header = T, sep="\t")
+
+# Individual Subjects
+subjList <- unique(rawdata[,"subjID"])  # list of subjects x blocks
+numSubjs <- length(subjList)  # number of subjects
+
+```
+
+# Organize data
+
+```{r}
+
+Tsubj <- as.vector( rep( 0, numSubjs ) ) # number of trials for each subject
+  
+for ( i in 1:numSubjs )  {
+    curSubj  <- subjList[ i ]
+    Tsubj[i] <- sum( rawdata$subjID == curSubj )  
+}
+  
+# Setting maxTrials
+maxTrials <- max(Tsubj)
+  
+choice  <- array(-1, c(numSubjs, maxTrials) )
+outcome <- array(0, c(numSubjs, maxTrials) )
+  
+for (i in 1:numSubjs) {
+    curSubj      <- subjList[i]
+    useTrials    <- Tsubj[i]
+    tmp          <- subset(rawdata, rawdata$subjID == curSubj)
+    choice[i, 1:useTrials] <- tmp$choice
+    outcome[i, 1:useTrials] <- 1*(tmp$outcome>0) # assume gain or nothing
+}
+
+dataList <- list(
+    N       = numSubjs,
+    T       = maxTrials,
+    Tsubj   = Tsubj,
+    choice  = choice,
+    outcome = outcome
+)
+
+  
+
+```
+
+```{r}
+# Set sampler parameters
+adapt_delta   = 0.99
+stepsize      = 1
+max_treedepth = 10
+nchain        = 4
+nthin         = 1
+niter         = 3000
+nwarmup       = 1000
+nthin         = 1
+
+```
+
+## Reward-punishment model (den Ouden et al., 2013)
+# Parameter estimation
+```{r}
+
+# Specify the number of parameters and parameters of interest 
+numPars <- 3
+parameters <- c("mu_Apun", "mu_Arew", "mu_beta", 
+               "sigma",
+               "Apun", "Arew", "beta", 
+               "log_lik")
+
+dataList$numPars = numPars
+
+# Estimation
+
+fit.rp <- stan(file = "stan_models/prl_rp.stan",
+                  data   = dataList, 
+                  pars   = parameters,
+                  warmup = nwarmup,
+                  iter   = niter, 
+                  chains = nchain,
+                  thin   = nthin,
+                  control = list(adapt_delta   = adapt_delta, 
+                                 max_treedepth = max_treedepth, 
+                                 stepsize      = stepsize) )
+```
+
+```{r}
+# Load fits
+#load('results/prl_models3000.RData')
+```
+
+# Extract parameters
+```{r}
+
+  ## Extract parameters
+  parVals <- rstan::extract(fit.rp, permuted=T)
+
+  Apun <- parVals$Apun
+  Arew <- parVals$Arew
+  beta <- parVals$beta
+  
+  # Individual parameters (e.g., individual posterior means)
+  allIndPars <- array(NA, c(numSubjs, numPars))
+  allIndPars <- as.data.frame(allIndPars)
+
+
+  for (i in 1:numSubjs) {
+      allIndPars[i, ] <- c( mean(Apun[, i]), 
+                            mean(Arew[, i]), 
+                            mean(beta[, i]) )
+  }
+  
+  allIndPars           <- cbind(allIndPars, subjList)
+  colnames(allIndPars) <- c("Apun", 
+                            "Arew", 
+                            "beta", 
+                            "subjID")
+
+  allIndPars.rp = allIndPars
+```
+
+## Experience-weighted attraction model (den Ouden et al., 2013)
+# Parameter estimation
+
+```{r}
+
+# Specify the number of parameters and parameters of interest 
+numPars <- 3
+parameters <- c("mu_phi", "mu_rho", "mu_beta",
+               "sigma",
+               "phi", "rho", "beta",
+               "log_lik")
+dataList$numPars = numPars
+
+# Estimation
+
+fit.ewa <- stan(file = "stan_models/prl_ewa.stan",
+                  data   = dataList, 
+                  pars   = parameters,
+                  warmup = nwarmup,
+                  iter   = niter, 
+                  chains = nchain,
+                  thin   = nthin,
+                  control = list(adapt_delta   = adapt_delta, 
+                                 max_treedepth = max_treedepth, 
+                                 stepsize      = stepsize) )
+```
+
+# Extract parameters
+
+```{r}
+## Extract parameters
+  parVals <- rstan::extract(fit.ewa, permuted=T)
+
+  phi  <- parVals$phi
+  rho  <- parVals$rho
+  beta <- parVals$beta
+  # Individual parameters (e.g., individual posterior means)
+  allIndPars <- array(NA, c(numSubjs, numPars))
+  allIndPars <- as.data.frame(allIndPars)
+  
+  for (i in 1:numSubjs) {
+      allIndPars[i, ] <- c( mean(phi[, i]), 
+                            mean(rho[, i]), 
+                            mean(beta[, i]) )
+  }
+  
+  allIndPars           <- cbind(allIndPars, subjList)
+  colnames(allIndPars) <- c("phi", 
+                            "rho", 
+                            "beta", 
+                            "subjID")
+
+allIndPars.ewa = allIndPars
+
+```
+
+
+
+```{r}
+#save(fit.rp, fit.ewa, file = 'results/prl_models3000.RData')
+```
+
+
+# Exercises
+
+- Make sure you understand the data, the models and the content of the myfit object. Check that the sampling procedure has converged. 
+
+- What is the interpretation of the parameters in the models? 
+
+- In the first model, do subjects learn more from rewards or from punishments? Is the initial hypothesis supported?
+
+- In the first model, rewrite the update rule so that it can be used for outcomes different from {0, 1}.
+
+- In the second model, generate and plot the experience weights. 

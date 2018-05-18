@@ -6,4 +6,12 @@ FSF_OUTPUT_FORMAT nii.gz
 SUBJECTS_DIR      /Applications/freesurfer/subjects
 MNI_DIR           /Applications/freesurfer/mni
 FSL_DIR           /Applications/fsl
-]0;~/GitHub/CompModCourse[?1034h130-229-9-233-dhcp:CompModCourse alebedev$ [K130-229-9-233-dhcp:CompModCourse alebedev$ 
+]0;~/GitHub/CompModCourse[?1034h130-229-9-233-dhcp:CompModCourse alebedev$ [K130-229-9-233-dhcp:CompModCourse alebedev$ -------- freesurfer-Darwin-OSX-stable-pub-v6.0.0-2beb96c --------
+Setting up environment for FreeSurfer/FS-FAST (and FSL)
+FREESURFER_HOME   /Applications/freesurfer
+FSFAST_HOME       /Applications/freesurfer/fsfast
+FSF_OUTPUT_FORMAT nii.gz
+SUBJECTS_DIR      /Applications/freesurfer/subjects
+MNI_DIR           /Applications/freesurfer/mni
+FSL_DIR           /Applications/fsl
+[K130-229-12-179-dhcp:CompModCourse alebedev$ 

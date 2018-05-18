@@ -1,0 +1,156 @@
+---
+title: "Delay discounting (Hyperbolic model)"
+output: html_notebook
+---
+
+
+Hyperbolic model for the delay discounting task (Mazur 1987).
+
+```{r, echo = F}
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Load some data
+
+Delays are in days, amounts in USD.
+
+```{r}
+#definitions
+data_file = 'data/dd_exampleData.txt'
+
+rawdata <- read.table( data_file, header = T, sep="\t")
+
+# Individual Subjects
+subjList <- unique(rawdata[,"subjID"])  # list of subjects x blocks
+numSubjs <- length(subjList)  # number of subjects
+
+# Specify the number of parameters and parameters of interest 
+numPars <- 2
+parameters <- c("mu_k", "mu_beta", 
+                "sigma",
+                "k", "beta", 
+                "log_lik")
+```
+
+# Organize the data
+
+```{r}
+
+Tsubj <- as.vector( rep( 0, numSubjs ) ) # number of trials for each subject
+
+for ( i in 1:numSubjs )  {
+  curSubj  <- subjList[ i ]
+  Tsubj[i] <- sum( rawdata$subjID == curSubj )  # Tsubj[N]
+}
+
+# Setting maxTrials
+maxTrials <- max(Tsubj)
+
+delay_later   <- array(0, c(numSubjs, maxTrials) )
+amount_later  <- array(0, c(numSubjs, maxTrials) )
+delay_sooner  <- array(0, c(numSubjs, maxTrials) )
+amount_sooner <- array(0, c(numSubjs, maxTrials) )
+choice <- array(0, c(numSubjs, maxTrials) )
+
+for (i in 1:numSubjs) {
+  curSubj      <- subjList[i]
+  useTrials    <- Tsubj[i]
+  tmp          <- subset(rawdata, rawdata$subjID == curSubj)
+  delay_later[i, 1:useTrials]   <- tmp$delay_later
+  amount_later[i, 1:useTrials]  <- tmp$amount_later
+  delay_sooner[i, 1:useTrials]  <- tmp$delay_sooner
+  amount_sooner[i, 1:useTrials] <- tmp$amount_sooner
+  choice[i, 1:useTrials] <- tmp$choice
+}
+
+dataList <- list(
+  N             = numSubjs,
+  T             = maxTrials,
+  Tsubj         = Tsubj,
+  amount_later  = amount_later,
+  delay_later   = delay_later,
+  amount_sooner = amount_sooner,
+  delay_sooner  = delay_sooner,
+  choice        = choice
+)
+
+```
+
+
+# Estimate
+
+```{r}
+# Set sampler parameters
+adapt_delta   = 0.95
+stepsize      = 1
+max_treedepth = 10
+nchain        = 4
+nthin         = 1
+niter         = 3000
+nwarmup       = 1000
+nthin         = 1
+
+# Estimation
+
+myfit <- stan(file    = "stan_models/dd_hyperbolic.stan",
+                  data    = dataList, 
+#                  pars    = parameters,
+                  warmup  = nwarmup,
+#                  init    = genInitList, 
+                  iter    = niter, 
+                  chains  = nchain,
+                  thin    = nthin,
+                  control = list(adapt_delta   = adapt_delta, 
+                                 max_treedepth = max_treedepth, 
+                                 stepsize      = stepsize) )
+
+
+```
+
+## Extract parameters
+
+```{r}
+# Load previous fit
+# load('results/delay_discounting_hyperbolic.RData')
+
+parVals <- extract(myfit, permuted=T)
+
+k    <- parVals$k
+beta <- parVals$beta
+
+# Individual parameters (e.g., individual posterior means)
+allIndPars <- array(NA, c(numSubjs, numPars))
+allIndPars <- as.data.frame(allIndPars)
+
+for (i in 1:numSubjs) {
+    allIndPars[i, ] <- c( mean(k[, i]), 
+                          mean(beta[, i]) )
+}
+
+allIndPars           <- cbind(allIndPars, subjList)
+colnames(allIndPars) <- c("k", 
+                          "beta", 
+                          "subjID")
+
+
+```
+
+```{r}
+# Save the fit
+# save(myfit, file = 'results/delay_discounting_hyperbolic.RData')
+
+```
+
+# Exercises
+
+- Make sure you understand the data, the model and the content of the myfit object. Check that the sampling procedure has converged. 
+
+- What is the interpretation of the parameters beta and k? 
+
+- Change the model so that k and beta are defined as real positive numbers instead of in the interval (0, 1).
+
+- Modify the model for the case of exponential instead of hyperbolic delay discounting. 

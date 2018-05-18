@@ -1,0 +1,49 @@
+---
+title: "Hierarchical model"
+output: html_notebook
+---
+
+A hierarchical model of the Eight Schools dataset (Rubin et al., 1981). The data are the effects of Scholastic Aptitude Test (SAT) coaching on school performance in eight different schools. 
+
+
+```{r, echo = F}
+# clears workspace: 
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Create some data
+```{r}
+input_data <- list(J = 8, 
+                    y = c(28,  8, -3,  7, -1,  1, 18, 12),
+                    sigma = c(15, 10, 16, 11,  9, 11, 10, 18)
+                    )
+```
+
+# Estimate the model
+```{r}
+fit_cp <- stan(file='stan_models/eight_schools_cp.stan', data=input_data,
+                 iter=2000, 
+                 warmup=1000, 
+                 chains=4, 
+                 seed=11,
+                 control=list(adapt_delta=0.8)
+                 )
+
+``````
+
+
+#Exercises: 
+
+- Inspect the chains and check the diagnostic measures.
+
+- What happens if you increase the number of iterations?
+
+- What happens if you increase adapt_delta?
+
+- Try rewriting the model using the non-centered parameterization.
+
+- Go back to the IQ_measures example and rewrite the model as a hierarchical one (for the means).  

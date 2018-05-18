@@ -1,0 +1,187 @@
+---
+title: "Drift diffusion model"
+output: html_notebook
+---
+
+Drift diffusion model (Ratcliff 1978). 
+
+```{r, echo = F}
+rm(list=ls()) 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+# Load some data
+
+
+```{r}
+#definitions
+data_file = 'data/choiceRT_exampleData.txt'
+
+rawdata <- read.table( data_file, header = T, sep="\t")
+
+# Individual Subjects
+subjList <- unique(rawdata[,"subjID"])  # list of subjects x blocks
+numSubjs <- length(subjList)  # number of subjects
+
+# Specify the number of parameters and parameters of interest 
+numPars <- 4
+parameters <- c("mu_alpha", "mu_beta", "mu_delta", "mu_tau",
+                "sigma",
+                "alpha", "beta", "delta", "tau", 
+                "log_lik")
+```
+
+# Organize the data
+RT in seconds
+
+```{r}
+RTbound = 0.1
+
+Tsubj <- as.vector( rep( 0, numSubjs ) ) # number of trials for each subject
+
+for ( i in 1:numSubjs )  {
+  curSubj  <- subjList[i]
+  Tsubj[i] <- sum( rawdata$subjID == curSubj )  # Tsubj[N]
+}
+
+# Setting maxTrials
+maxTrials <- max(Tsubj)
+
+
+# Number of upper and lower boundary responses for each subject
+Nu <- with(rawdata, aggregate(choice==2, by=list(y=subjID), FUN=sum)[["x"]])
+Nl <- with(rawdata, aggregate(choice==1, by=list(y=subjID), FUN=sum)[["x"]])
+
+# Minimum response time per subject
+minRT <- with(rawdata, aggregate(RT, by=list(y=subjID), FUN=min)[["x"]])
+
+# response times for upper and lower boundary responses
+RTu <- array(0, c(numSubjs, max(Nu)) ) 
+RTl <- array(0, c(numSubjs, max(Nl)) )
+
+# Store each subjects' response time data
+for (i in 1:numSubjs) {
+  curSubj         <- subjList[i]
+  tmp             <- subset(rawdata, rawdata$subjID == curSubj)
+  RTu[i, 1:Nu[i]] <- tmp$RT[tmp$choice==2] # (Nu/Nl[i]+1):Nu/Nl_max will be padded with 0's 
+  RTl[i, 1:Nl[i]] <- tmp$RT[tmp$choice==1] # 0 padding is skipped in likelihood calculation
+}
+
+# List of data sent to Stan
+dataList <- list(
+  N       = numSubjs, # Number of subjects
+  Nu_max  = max(Nu),  # Max (across subjects) number of upper boundary responses
+  Nl_max  = max(Nl),  # Max (across subjects) number of lower boundary responses
+  Nu      = Nu,       # Number of upper boundary responses for each subj
+  Nl      = Nl,       # Number of lower boundary responses for each subj
+  RTu     = RTu,      # upper boundary response times
+  RTl     = RTl,      # lower boundary response times
+  minRT   = minRT,    # minimum RT for each subject of the observed data 
+  RTbound = RTbound   # lower bound or RT across all subjects (e.g., 0.1 second)
+)
+
+```
+
+# Generate initial values
+
+```{r}
+
+# This initialization will facilitate the sampling
+
+inits_fixed <- c(0.5, 0.5, 0.5, 0.15)
+
+genInitList = function(){ 
+    list(
+      mu_p     = c( log(inits_fixed[1]), qnorm(inits_fixed[2]), log(inits_fixed[3]), qnorm(inits_fixed[4]) ),
+      sigma    = c(1.0, 1.0, 1.0, 1.0),
+      alpha_pr = rep( log(inits_fixed[1]), numSubjs),
+      beta_pr  = rep( qnorm(inits_fixed[2]), numSubjs),
+      delta_pr = rep( log(inits_fixed[3]), numSubjs),
+      tau_pr   = rep( qnorm(inits_fixed[4]), numSubjs)
+    )
+}
+
+```
+
+# Parameter estimation
+
+```{r}
+# Set sampler parameters
+adapt_delta   = 0.95
+stepsize      = 1
+max_treedepth = 10
+nchain        = 4
+nthin         = 1
+niter         = 3000
+nwarmup       = 1000
+nthin         = 1
+
+# Estimation
+
+myfit <- stan(file = "stan_models/choiceRT_ddm.stan",
+                  data   = dataList, 
+                  pars   = parameters,
+                  warmup = nwarmup,
+                  init   = genInitList, 
+                  iter   = niter, 
+                  chains = nchain,
+                  thin   = nthin,
+                  control = list(adapt_delta   = adapt_delta, 
+                                 max_treedepth = max_treedepth, 
+                                 stepsize      = stepsize) )
+```
+
+# Extract parameters
+
+```{r}
+
+# Load previous fit
+# load('results/drift_diffusion3000.RData')
+
+
+## Extract parameters
+parVals <- extract(myfit, permuted=T)
+
+alpha <- parVals$alpha
+beta  <- parVals$beta
+delta <- parVals$delta
+tau   <- parVals$tau
+
+# Individual parameters (e.g., individual posterior means)
+allIndPars <- array(NA, c(numSubjs, numPars))
+allIndPars <- as.data.frame(allIndPars)
+
+for (i in 1:numSubjs) {
+    allIndPars[i, ] <- c( mean(alpha[, i]), 
+                          mean(beta[, i]),
+                          mean(delta[, i]),
+                          mean(tau[, i]))
+}
+
+allIndPars           <- cbind(allIndPars, subjList)
+colnames(allIndPars) <- c("alpha", 
+                          "beta",
+                          "delta",
+                          "tau",
+                          "subjID")
+
+```
+
+
+```{r}
+# Save the fit
+# save(myfit, file = 'results/drift_diffusion3000.RData')
+
+```
+
+# Exercises
+
+- Make sure you understand the data, the model and the content of the myfit object. Check that the sampling procedure has converged. 
+
+- Can you find an example of application of this model in your research?
+
+- What is the interpretation of the parameters alpha, beta, delta and tau? 
+

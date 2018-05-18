@@ -1,0 +1,46 @@
+---
+title: "Delay discounting (Hyperbolic model) using hBayesDM"
+output: html_notebook
+---
+
+
+Hyperbolic model for the delay discounting task (Mazur 1987). We use the package hBayesDM to fit the model. 
+
+```{r, echo = F}
+rm(list=ls()) 
+library(hBayesDM)
+```
+
+
+# Fit model using hBayesDM 
+
+```{r}
+
+output = dd_hyperbolic("data/dd_exampleData.txt", 
+                       niter=3000, 
+                       nwarmup=1000, 
+                       nchain=4, 
+                       ncore=4)
+
+```
+# Print the results
+
+```{r}
+
+print(output$allIndPars)
+
+printFit(output)
+```
+
+# Plot the results
+
+```{r}
+
+plot(output, type="trace", inc_warmup=T)
+
+plot(output)
+
+# individual parameters
+plotInd(output, "k")
+
+```
