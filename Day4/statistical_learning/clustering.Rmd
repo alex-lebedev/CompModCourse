@@ -1,0 +1,128 @@
+---
+title: "Clustering"
+output: html_notebook
+---
+
+This notebook is adapted from *An introduction to statistical learning*, G.James, D. Witten, T. Hastie and R. Tibshirani.
+
+
+## Generating data
+
+For this notebook we will generate a data set *x* in two dimensions with 2 clusters of 25 observations each.  
+
+```{r}
+rm(list=ls()) # clears workspace
+set.seed(2)
+x <- matrix(rnorm(50*2),ncol=2)
+x[1:25,1 ] <- x[1:25,1 ]+3
+x[1:25, 2] <- x[1:25,2 ]-4
+
+plot(x)
+```
+
+## K-means clustering
+
+We will perform k-means clustering. For this we have to set the number of clusters. We will use k=2. 
+The value of *nstart* determines how many times the algorithm will be run using initial different cluster assignements. 
+
+```{r}
+km.out2 <- kmeans(x,2,nstart=20)
+km.out2
+```
+
+Observing the output you see that the algorithm divided the data into the 2 correct clusters.
+
+The observations can be plotted using colours to distinguish the clusters.
+
+```{r}
+plot(x,col=km.out2$cluster, main="K-means clustering with k=2",pch=20)
+```
+
+We can use the same generated data but specifying k=3. 
+
+```{r}
+set.seed(4)
+km.out3 <- kmeans(x,3,nstart=20)
+km.out3$cluster
+plot(x,col=km.out3$cluster, main="K-means clustering with k=3",pch=20)
+```
+
+What do you observe?
+
+### Avoiding local optima
+
+Running the algorithm with a large number of initial assignments minimizes the risk of convergence to a suboptimal solution.
+To illustrate this point we can run the algorithm with k=3 and nstart=1. Observe the value of the total within-cluster sum of squares. 
+
+```{r}
+set.seed(4)
+km.out3a <- kmeans(x,3,nstart=1)
+km.out3a$tot.withinss
+plot(x,col=km.out3a$cluster, main="K-means clustering with k=3",pch=20)
+```
+
+
+Repeat the procedure  several times. What are the results? Does the total within-cluster sum of squares change?
+
+```{r}
+km.out3a <- kmeans(x,3,nstart=1)
+km.out3a$tot.withinss
+plot(x,col=km.out3a$cluster, main="K-means clustering with k=3",pch=20)
+```
+
+
+
+Repeat the steps above but using nstart=20. What are the results?
+
+### Deciding the number of clusters
+
+Many ways have been proposed for deciding on the number of clusters one should use to divide the data.
+Here we will use a very simple method. We will compare the total within-cluster sum of squares for 1 to 7 clusters. 
+Observing the results, what value of k do you think should be used?
+
+```{r}
+wss <- vector()
+for (i in 1:7) {
+  km.aux <- kmeans(x,i,nstart=20)
+  wss[i] <- km.aux$tot.withinss
+}
+
+plot(1:7, wss, type="o", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+```
+
+## Hierarchical clustering
+
+We will use the function *hclust()* to apply hierarchical clustering to the same simulated data set.
+We will use euclidean distance and 3 different linkages: complete, average and single.
+
+
+```{r}
+hc.complete <- hclust(dist(x), method="complete")
+hc.average <- hclust(dist(x), method="average")
+hc.single <- hclust(dist(x), method="single")
+
+plot(hc.complete,main="Complete linkage",cex=0.6)
+plot(hc.average,main="Average linkage",cex=0.6)
+plot(hc.single,main="Single linkage",cex=0.6)
+```
+
+The numbers at the bottom of the plots identify each observation.
+
+How do the different results compare to each other?
+
+### Cutting the dendograms
+
+For a given cut of the dendogram one gets the associated labels for the observations. 
+We can start by cutting the dendogram for the complete linkage to obtain 2 clusters.
+
+```{r}
+cut2.complete<-cutree(hc.complete,2)
+cut2.complete
+plot(x,col=cut2.complete, main="Hierarchical clustering, complete linkage",pch=20)
+
+```
+
+Now cut the dendograms obtained using  average and single linkages. Plot the resulting 2 clusters for both cases. What do you observe?
+

@@ -1,0 +1,164 @@
+---
+title: "Ridge regression"
+output: html_notebook
+---
+This notebook is based on material from *An introduction to statistical learning*, G.James, D. Witten, T. Hastie and R. Tibshirani.
+
+We will use a freely available data set. The dataset is described and used in the book *Statistical Methods for Psychology*, from D. C. Howell. 
+
+The data was collected from 381 students. A subset of the students had lost a parent during childhood. The data was collected to investigate the relations between parental loss and levels of symptomatology and of self-perceived vulnerability to loss. 
+The variables included in the data set are the following:
+
+ID - subject identification  
+Group - 1 if a parent were lost, 2 if parents are together, 3 if parents are divorced  
+Gender - 1 for male, 2 for female  
+YearColl - year attended in college, 0 if not in college  
+GPA - grade point average, 4 is maximun and 0 is minimum  
+LostPGen - gender of lost parent  
+AgeAtLos - Age at parents death  
+SomT - Somatization T score  
+ObsessT - Obsessive-compulsive T score  
+SensitT - Interperssonal sensitivity T score  
+DepressT - Depression T score  
+AnxT - Anxiety T score  
+HostT - Hostility T score  
+PhobT - Phobic anxiety T score  
+ParT - Paranoid ideation T score  
+PsyT - Psychoticism T score  
+GSIT - Global symptom index T score  
+PVTotal - Perceived vulnerability total score  
+PVLoss - Perceived vulnerability to loss  
+SuppTotal - Social support score  
+
+
+This notebook uses the library glmnet.
+Start by loading the library and the data, stored in text format in the file *Mireault2.dat*.
+
+```{r}
+rm(list=ls()) # clears workspace
+library(glmnet)
+datafilename <- file.choose()
+d1 <- read.table(datafilename,header=TRUE)
+```
+
+### Preparing the data
+
+For simplicity we will create two new variables. A logical variable *Loss* that takes the values *TRUE* if The student has lost a parent and *FALSE* otherwise; and a logical variable *College* that takes the value *TRUE* if the student is in college and *FALSE* otherwise. 
+
+Then we will create a new data set d1a by removing from d1 some variables we are not going to use in this notebook. Namely remove the variables: ID, Group, YearColl, GPA, LostPGen, AgeAtLos, GSIT and PVLoss.
+
+
+```{r}
+d1$Loss <- d1$Group==1
+d1$College <- d1$YearColl >0
+d1a<-d1[,c(-1,-2,-4,-6:-8,-18,-20)]
+```
+
+### Fitting a linear model with least squares
+
+To start we will fit a linear model with least squares, using *PvTotal* as outcome variable and all the other variables in d1a as independent variables. The results are stored in *linear.mod1*. The function *summary()* shows a summary of the procedure and the results. 
+
+
+```{r}
+linear.mod1 <- lm(PVTotal~ factor(Gender) + factor(College)+ SomT+ ObsessT + SensitT + DepressT + AnxT + HostT + PhobT + ParT + PsyT+ SuppTotl + factor(Loss),data=d1a )
+summary(linear.mod1)
+```
+
+Another way to fit the same model is to create a design matrix *x*, with all the explanatory variables. Note that the categorical variables take just 2 possible values and hence the *factor()* specification can be omitted.
+
+
+```{r}
+x<-model.matrix(PVTotal~.,d1a)[,-1]
+y<-d1a$PVTotal
+linear.mod2 <- lm(y~x)
+summary(linear.mod2)
+```
+
+### Fitting a ridge regression
+
+We start by using the function *glmnet* to fit exactly the same model as above. The parameter *alpha* defines what method to be used: 0 for ridge regression and 1 for Lasso. We will use ridge regression.
+Setting the ridge regression with *lambda=0* is the same as using least squares. The command function *coef()* shows the parameter estimates.
+
+```{r}
+linear.mod3 <- glmnet (x ,y , alpha =0 , lambda = 0,standardize=FALSE)
+coef(linear.mod3)
+```
+
+
+Now we will fit a real ridge regression. For example, a lambda of 100 can be used. Note that the variables will be standardized. Why do you think one should do this?
+
+```{r}
+ridge.mod1 <- glmnet (x ,y , alpha =0 , lambda = 100,standardize=TRUE)
+coef(ridge.mod1)
+```
+
+Observe the coefficients. What are the variables that constribute more to the model?
+
+Now try a much larger value of lambda? What happens to the coeficients?
+Try also a smaller value of lambda. What happens to the coeficients?
+
+
+### Estimating the test error
+
+To estimate the test error we will split the data into a training and a test set. We can use the function *sample()* to draw a random sample of half of the subjects. One half will be the training set and the other the test set. We are setting the seed of the random number generator, so that the results obtained are reproducible.
+
+```{r}
+set.seed (1)
+train <- sample (1:nrow(x),nrow(x)/2)
+test <- ( -train )
+y.test <- y [test]
+```
+
+We choose again lambda=100 and fit a ridge regression model on the training set. We use the function *predict* to apply the estimated model on the test data set. Finally we can calculate the test mean standard error.
+
+```{r}
+ridge.mod2 <-glmnet (x[train, ] ,y[train] , alpha =0 , lambda = 100,standardize=TRUE)
+ridge.pred2 <- predict.glmnet(ridge.mod2, newx=x[test, ])
+mean((ridge.pred2-y.test)^2)
+```
+
+
+We choose another lambda (2, for example) and we repeat the previous steps.
+
+```{r}
+ridge.mod3 <-glmnet (x[train, ] ,y[train] , alpha =0 , lambda = 2 ,standardize=TRUE)
+ridge.pred3 <- predict.glmnet(ridge.mod3, newx=x[test, ])
+mean((ridge.pred3-y.test)^2)
+```
+
+What lambda is best?
+
+
+### Finding the best parameter using cross-validation
+
+To set a good value of lambda we will use cross-validation. To do this we will use the cross-validation function *cv.glmnet()*. The function by default performs ten-fold cross-validation. We plot MSE as a function of log(lambda) and return the value of the best lambda.
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(x[train, ],y[train],alpha=0)
+plot(cv.out)
+bestlam<-cv.out$lambda.min
+bestlam
+```
+
+
+We can use the best lambda and plot the predict outcome as a function of the real value.
+
+```{r}
+ridge.mod4 <-glmnet (x[train, ] ,y[train] , alpha =0 , lambda = bestlam,standardize=TRUE)
+ridge.pred4 <- predict.glmnet(ridge.mod4, newx=x[test, ])
+plot(y.test, ridge.pred4, xlim=c(40,140),ylim=c(40,140))
+```
+
+### Further exercises
+
+- What do you think about the predictions?  
+- What conclusions can you take (from any of the analyzes above)?  
+- How would you analyze the data?   
+
+
+- You can analyze the same data using lasso. Use alpha=1. Compare the coefficients.   
+How do they differ?  
+
+- You can also analyze a subset of the data (for example only individuals that lost a parent) and include some of the variables that were excluded previously. 
+

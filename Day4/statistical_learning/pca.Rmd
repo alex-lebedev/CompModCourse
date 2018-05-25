@@ -1,0 +1,60 @@
+---
+title: "Principal component analysis"
+output: html_notebook
+---
+
+This notebook is based on material from *An introduction to statistical learning*, G.James, D. Witten, T. Hastie and R. Tibshirani.
+
+We will work the same dataset we used on the ridge regression notebook. We start by loading the data set from the file *Mireault2.dat*. We will use only the variables measuring levels of symptomatology:
+
+SomT - Somatization T score  
+ObsessT - Obsessive-compulsive T score  
+SensitT - Interperssonal sensitivity T score  
+DepressT - Depression T score  
+AnxT - Anxiety T score  
+HostT - Hostility T score  
+PhobT - Phobic anxiety T score  
+ParT - Paranoid ideation T score  
+PsyT - Psychoticism T score  
+
+```{r}
+rm(list=ls()) # clears workspace
+datafilename <- file.choose()
+d1 <- read.table(datafilename,header=TRUE)
+d <- d1[,c(9:17)]
+```
+
+We will use the function *prcomp()*  to perform PCA. By default the variables are mean centered before. Setting the parameter *scale* to *TRUE* makes the variables scaled so that they have variance 1.
+
+```{r}
+pca.out <- prcomp(d,scale=TRUE)
+summary(pca.out)
+```
+
+There is a number of useful outputs from *prcomp*. The *rotation* matrix gives the loading of the original variables in each of the principal components.
+The *x* matrix contains score vectors, that is the observations in the space of the principal components. Observe the matrices *rotation* amd *x*.
+
+```{r}
+pca.out$rotation
+pca.out$x
+```
+
+We will plot the first two principal components. The option *scale=0* assures the loading arrows are scaled.
+
+```{r}
+biplot(pca.out,scale=0)
+```
+
+From the output we can extract the proportion of variance explained by each component. We can use these quantities to create a scree plot.  These quantities can be ploted and used to determine how many components can be used to describe the data.
+
+```{r}
+pca.pVAR <- summary(pca.out)$importance[2, ]
+plot(pca.pVAR,xlab="Principal component",ylab= "Proportion of variance explained", 
+     ylim=c(0,1),type='o')
+```
+
+Oberve the results. How many components do you think suffice to summarize the data?
+
+### Further exercise
+
+- The cumulative proportion of variance explained by the ordered components can also be extracted easily from the output of *prcomp*. Plot these quantity as a function of the components.

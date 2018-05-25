@@ -1,5 +1,7 @@
 # Load libraries:
 
+rm(list=ls())
+
 library(R.matlab)
 library(RSEIS)
 library(xlsx)
@@ -135,12 +137,21 @@ save(final_d, file='/Users/alebedev/GitHub/CompModCourse/assignment/data/final_d
 ############
 # ANALYSIS #
 ############
+rm(list=ls())
+library(rstan)
+range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 
 load('/Users/alebedev/GitHub/CompModCourse/assignment/data/final_d.rda')
 final_d$fix <- as.numeric(final_d$fix)
 final_d$face <- as.numeric(final_d$face)
 final_d$reversal_first <- 0
 final_d$reversal_first[which(final_d$fix==2)+1] <- 1
+
+final_d$gsr <- range01(final_d$gsr)
+
 rdata <- rbind(final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d)
 rdata$subject <- c(rep(1,max(rdata$trial)),
                    rep(2,max(rdata$trial)),
@@ -158,7 +169,10 @@ rdata$subject <- c(rep(1,max(rdata$trial)),
 rdata$gsr <- rdata$gsr+sqrt(rnorm(800,0,0.5)^2)
                    
 
-rdata <- rdata[,c('subject', 'trial', 'gsr', 'face', 'cs', 'reversal_first')]
+rdata <- rdata[,c('subject', 'trial', 'gsr', 'face', 'shock', 'cs', 'reversal_first')]
+# rdata$choice <- 1
+# rdata$choice[rdata$gsr>mean(rdata$gsr)]<-2
+# rdata$gsr <- rdata$choice
 
 # Reorganize the data:
 subjList <- unique(rdata[,'subject'])  # list of subjects x blocks
@@ -189,7 +203,7 @@ dataList <- list(
 )
 #########
 # Set sampler parameters
-adapt_delta   = 0.95
+adapt_delta   = 0.99
 stepsize      = 1
 max_treedepth = 10
 nchain        = 4

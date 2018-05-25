@@ -2,7 +2,7 @@ data {
   int<lower=1> N;
   int<lower=1> T;               
   int<lower=1,upper=T> Tsubj[N];                 
-  int<lower=0> choice[N,T];     
+  real<lower=0,upper=1> response[N,T];     
   real outcome[N,T];  // no lower and upper bounds   
 }
 
@@ -20,6 +20,7 @@ parameters {
   // Subject-level raw parameters (for Matt trick)
   vector[N] A_pr;    // learning rate
   vector[N] tau_pr;  // inverse temperature
+  real<lower=0> gamma;
 }
 
 transformed parameters {
@@ -36,7 +37,8 @@ transformed parameters {
 model {
   // Hyperparameters
   mu_p  ~ normal(0, 1); 
-  sigma ~ cauchy(0, 5);  
+  sigma ~ cauchy(0, 5);
+  gamma ~ cauchy(0, 1);
   
   // individual parameters
   A_pr   ~ normal(0,1);
@@ -51,61 +53,15 @@ model {
     
     for (t in 1:(Tsubj[i])) {        
       // compute action probabilities
-      choice[i,t] ~ categorical_logit( tau[i] * ev );
+     // response[i,t] ~ normal( tau[i] * ev,gamma);
       
       // prediction error 
-      PE = outcome[i,t] - ev[choice[i,t]];
+      PE = outcome[i,t] - ev;
       
       // value updating (learning) 
-      ev[choice[i,t]] = ev[choice[i,t]] + A[i] * PE; 
+      ev[response[i,t]] = ev[response[i,t]] + A[i] * PE; 
     }
   }
 }
 
-generated quantities {
-  // For group level parameters
-  real<lower=0,upper=1> mu_A; 
-  real<lower=0,upper=5> mu_tau;
-  
-  // For log likelihood calculation
-  real log_lik[N]; 
-  
-  // For posterior predictive check
-  real y_pred[N,T]; 
-  
-  // Set all posterior predictions to 0 (avoids NULL values)
-  for (i in 1:N) {
-    for (t in 1:T) {
-      y_pred[i,t] = -1;
-    }
-  }
-  
-  mu_A   = Phi_approx(mu_p[1]);
-  mu_tau = Phi_approx(mu_p[2]) * 5;
-  
-  { // local section, this saves time and space
-    for (i in 1:N) {
-      vector[2] ev; // expected value
-      real PE;      // prediction error
-      
-      // Initialize values
-      ev = initV;
-      
-      log_lik[i] = 0;
-      
-      for (t in 1:(Tsubj[i])) {
-        // compute log likelihood of current trial
-        log_lik[i] = log_lik[i] + categorical_logit_lpmf(choice[i,t] | tau[i] * ev);
-        
-        // generate posterior prediction for current trial
-        y_pred[i,t] = categorical_rng(softmax(tau[i] * ev));
-        
-        // prediction error 
-        PE = outcome[i,t] - ev[choice[i,t]];
-        
-        // value updating (learning) 
-        ev[choice[i,t]] = ev[choice[i,t]] + A[i] * PE; 
-      }
-    }   
-  }
-}
+

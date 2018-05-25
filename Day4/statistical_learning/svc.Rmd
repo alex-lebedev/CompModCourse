@@ -1,0 +1,169 @@
+---
+title: "Support vector classification"
+output: html_notebook
+---
+This notebook is adapted from *An introduction to statistical learning*, G.James, D. Witten, T. Hastie and R. Tibshirani.
+
+We will use the library e1071, and start by loading it. 
+
+```{r}
+rm(list=ls()) # clears workspace
+library(e1071)
+```
+
+
+### Generating data
+
+We generate a data set *x* in two dimensions and with two classes. The class labels (-1 and 1) are stored in the vector *l*. We plot the data points with different colors for the different classes.
+
+```{r}
+set.seed(1)
+x <- matrix(rnorm(20*2),ncol=2)
+l <- c(rep(-1,10),rep(1,10))
+x[l==1, ] <- x[l==1, ]+1
+dat <- data.frame(x=x,label=as.factor(l))
+plot(dat$x.2,dat$x.1,col=(5-l)) 
+```
+
+Are the classes linearly separable?
+
+
+### Fitting a support vector classifier
+
+We will use the function *svm()* to fit a support vector classifier with a specified cost value. One can set the cost to 10, for example. Note that the cost here is inverse of *C*. 
+Both the data to fit and the labels must be in the same data matrix. The labels must be defined as a factor. The classifier can be visualized using *plot()*.
+
+```{r}
+svmfit1 <- svm(label~., data=dat,kernel="linear",cost=10,scale=FALSE)
+plot(svmfit1,dat)
+```
+
+Note that the decision boundary is linear and divides the 2 dimensional space into two classes. The support vectors are plotted with crosses. The data points are color coded according to their label.  
+How many misclassified cases are there?
+
+
+To obtain the indexes of the support vectors one can use *svmfit$index*. The function *summary()* will give information about the classifier.
+
+```{r}
+svmfit1$index 
+summary(svmfit1)
+```
+
+Try another cost, for example 0.01. What do you observe? Compare the number of support vectors.
+
+```{r}
+svmfit2 <- svm(label~., data=dat,kernel="linear",cost=0.01,scale=FALSE)
+plot(svmfit2,dat)
+svmfit2$index 
+summary(svmfit2)
+```
+
+### Setting the cost using cross-validation
+
+The function *tune()* can be used to determine the cost by cross-validation. By default 10-fold cross-validation is used. We must provide a list of possible values for the cost. The cross-validation errors for each cost can be accessed using *summary()*.
+
+```{r}
+set.seed(1)
+tune.output <- tune(svm, label~.,data=dat, kernel="linear", 
+                    ranges=list(cost=c(0.001,0.01,0.1,1, 10, 100)))
+
+summary(tune.output)
+```
+
+Observe the results. What is the best cost value, among the ones tested?
+
+The function *tune()* stores the best model obtained in *best.model*
+
+```{r}
+bestmodel <- tune.output$best.model
+summary(bestmodel)
+plot(bestmodel,dat)
+```
+
+
+### Using the classifier to make predictions on a new data set
+
+The trained classifier can be used to predict labels for a new set of observations. We start by creating a new set of observations *xtest* and labels *ltest*.
+
+```{r}
+xtest <- matrix(rnorm(20*2),ncol=2)
+ltest <- c(rep(-1,10),rep(1,10))
+xtest[l==1, ] <- xtest[l==1, ]+1
+testdat <- data.frame(x=xtest,label=as.factor(ltest))
+```
+
+
+The function *predict()* can be used to classify the new observations using the best model.
+
+```{r}
+ypred <- predict(bestmodel,testdat)
+```
+
+To check how well the classifier performed, one can create a table of predicted classes versus true classes. This table is called a confusion matrix.
+
+```{r}
+table(predict=ypred, real=testdat$label)
+```
+
+How many correct and incorrect classifications do you observe?
+
+Try a new prediction from the same data, but using a model with  another cost. Fore example cost=0.001. What do you observe?
+
+### Example with linearly separable classes.
+
+Start by generating 10 observations of each one of 2 classes that are more separated. Check if the observations are linearly separated.
+
+```{r}
+set.seed(1)
+x2 <- matrix(rnorm(20*2),ncol=2)
+l2<- c(rep(-1,10),rep(1,10))
+x2[l2==1, ] <- x2[l2==1, ]+1.5
+dat2 <- data.frame(x=x2,label=as.factor(l2))
+plot(dat2$x.2,dat2$x.1,col=(5-l2))
+```
+
+Use a high cost=10000 to fit a classifier that separates the two classes. How many support vector are there? How large do you think the margins are?
+
+Fit a new classifier using a cost of 1. Observe the results. Then create a test data set to test both classifiers (the one with cost 10000 and the one with cost 1). How do they perform?  Compare the performances and reflect upon their difference.
+
+### Non-linear kernels
+
+To explore the usage of non-linear kernels we will create a 2 dimensional data set with a non-linear boundary between classes. 
+
+```{r}
+set.seed(1) 
+x3 <- matrix(rnorm(200*2),ncol=2)
+l3<- c(rep(1,150),rep(2,50))
+x3[1:100, ] <- x3[1:100, ]+2
+x3[101:150, ] <- x3[101:150, ]-2
+dat3 <- data.frame(x=x3,label=as.factor(l3))
+plot(dat3$x.2,dat3$x.1,col=l3)
+```
+
+The data can be divided into a train and a test sets. The train set can be used to fit a non-linear support vector classifier. We will use a radial kernel with both the cost and the gamma parameter set to 1. 
+
+```{r}
+train=sample(200,100)
+svmfit5=svm(label~.,data=dat3[train, ],kernel="radial", cost=1, gamma=1)
+plot(svmfit5,dat3[train, ])
+```
+
+Change the value of the cost to 10000 and fit a new classifier. What do you observe?
+
+We can use the function *tune()* to select the best cost and gamma among two given sets of possible values.
+
+```{r}
+set.seed(1)
+tune.output2 <- tune(svm, label~.,data=dat3[train,], kernel="radial", 
+                    ranges=list(cost=c(0.1,1, 10, 100,1000),
+                                gamma=c(0.5,1,2,3,4)))
+
+summary(tune.output2)
+
+bestmodel2 <- tune.output2$best.model
+summary(bestmodel2)
+plot(bestmodel2,dat3[train,])
+```
+
+
+How many observations are assigned to the wrong category if you apply this classifier to the test data?

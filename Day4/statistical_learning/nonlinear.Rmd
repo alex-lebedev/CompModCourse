@@ -1,0 +1,170 @@
+---
+title: "Non-linear regression"
+output: html_notebook
+---
+
+This notebook is based on material from *An introduction to statistical learning*, G.James, D. Witten, T. Hastie and R. Tibshirani.
+
+We will use a few variables of a data set from a working-memory training study. The variables are:
+
+subjectID - subject identification  
+IndexImprovement - an index quantifying how much the subjects improved during the training    
+indexStart - an index quantifying the subjects level at the start of the training  
+age - age of the subjects
+
+The notebook uses the library splines.
+Start by loading the library and the data, stored in csv format in the file *wm_age.csv*.
+
+```{r}
+rm(list=ls()) # clears workspace
+library(splines)
+datafilename <- file.choose()
+d <- read.csv(datafilename,header=TRUE)
+```
+
+In this notebook we will start by using indexStart as an outcome variable and age as a predictor.
+To get a feeling for the data, look at indexStart ploted as a function of age.
+
+```{r}
+plot(d$age,d$indexStart)
+```
+
+## Polynomial regression
+
+### Fitting a linear and a quadratic model in age
+
+We can fit both a linear and a quadratic model in age. To fit a quadratic model in age, one could create a new variable containing the values of the square of age for each individual. Another way is to use the function  *poly()*.
+
+```{r}
+p1 <- lm(indexStart~age,data=d)
+summary(p1)
+p2 <- lm(indexStart~poly(age,2,raw=TRUE),data=d)
+summary(p2) 
+```
+
+Look at the estimated coefficients and p-values.  
+Raw values of age and age squared were used for the fitting. One can use instead a basis of orthogonal polynomials of age, by omitting *raw=TRUE*.
+
+```{r}
+p2a<- lm(indexStart~poly(age,2),data=d) #using a basis function
+summary(p2a)
+
+```
+
+Observe the summary of the model p2a. How do the coefficents compare to those of model p2?
+
+
+### Making and ploting a prediction curve
+
+We will use the model p2 to make a prediction curve. We check the age range in the data set and create a new vector of ages *age.grid* covering the whole range in steps of 0.01.
+After we can create predicted outcomes and standard errors, for all the values of *age.grid* using the model p2. Then we plot the data and the prediction curve in the same plot. You can check what *cex*, *pch* and *lty* define in the help, or by setting them to other values.
+
+```{r}
+### making a prediction curve
+range(d$age)
+age.grid <-seq(from=7,to=20,by=0.01)
+preds <- predict(p2, newdata=list(age=age.grid),se = TRUE)
+se.bands <- cbind(preds$fit+2*preds$se.fit , preds$fit-2*preds$se.fit)
+
+#### plotting
+plot(d$age,d$indexStart,xlim=c(7,20),cex=0.5,pch=20)
+lines(age.grid,preds$fit,col="blue")
+matlines(age.grid,se.bands,col="blue",lty=3)
+```
+
+
+### Deciding what degree of the polynomial to use
+
+One can also fit a cubic and a degree-4 funtion of age.
+
+```{r}
+p3 <- lm(indexStart~poly(age,3,raw=TRUE),data=d)
+summary(p3) 
+
+p4 <- lm(indexStart~poly(age,4,raw=TRUE),data=d)
+summary(p4) 
+```
+
+
+To decide what degree of the polynomial to use, one can test the null hypothesis that a simpler model is enough to explain the data, compared to the alternative hypothesis that a more complex model is required. This can be done using an F-test with the *anova()* function, if the models to compare are nested.
+
+```{r}
+anova(p1,p2,p3,p4)
+```
+
+Observe the output. What are the p-values for the comparison between p2 and p1? And for the comparison between p3 and p2; and between p4 and p3? What degree of the polynomial you think should be used?
+
+Another way to decide what degree to use, would have been to use as predictors a basis of orthogonal polynomials of age. 
+
+```{r}
+p4a <- lm(indexStart~poly(age,4),data=d)
+summary(p4a)
+```
+
+Compare the p-values from the p4a model with those from the anova. What do you observe? Why do you think this is the case?
+
+
+## Splines
+
+The same data set can be used to fit regression splines.
+The function *bs()*  generates a matrix of basis for splines with specified knots. By default cubic splines are created. This matrix can be used together with *lm()* to fit regression splines.
+
+```{r}
+sp1 <- lm(indexStart~ bs(age,knots=c(9,12,15)),data=d)
+```
+
+
+### Making and ploting a prediction curve
+
+As for the polynomial regression, one can make and plot a prediction curve.
+
+```{r}
+pred.sp1 <- predict(sp1,newdata=list(age=age.grid),se=T)
+plot(d$age,d$indexStart,xlim=c(7,20),cex=0.5,pch=20)
+lines(age.grid,pred.sp1$fit,col="blue")
+lines(age.grid, pred.sp1$fit+2*pred.sp1$se,lty=3,col="blue")
+lines(age.grid, pred.sp1$fit-2*pred.sp1$se,lty=3,col="blue")
+```
+
+### Natural splines
+
+We can repeat the steps above but using the function *ns()* to fit a natural spline instead.
+
+```{r}
+sp2 <- lm(indexStart~ ns(age,knots=c(9,12,15)),data=d)
+
+pred.sp2 <- predict(sp2,newdata=list(age=age.grid),se=T)
+plot(d$age,d$indexStart,xlim=c(7,20),cex=0.5,pch=20)
+lines(age.grid,pred.sp2$fit,col="red")
+lines(age.grid, pred.sp2$fit+2*pred.sp2$se,lty=3,col="red")
+lines(age.grid, pred.sp2$fit-2*pred.sp2$se,lty=3,col="red")
+```
+
+Observe the plot. What is the main difference between the two fits?
+
+### Smoothing splines
+
+The function *smooth.splines()* can be used to fit smoothing splines with specified degrees of freedom *df*. The function determines the smoothing parameter that leads to a given df. We will start by choosing different dfs and plot the corresponding predicted curves. For example start with the values 16 and 3. What do you observe?
+
+```{r}
+sp3 <- smooth.spline(d$age,d$indexStart,df=16)
+sp4 <- smooth.spline(d$age,d$indexStart,df=3)
+
+plot(d$age,d$indexStart,xlim=c(7,20),cex=0.5,pch=20)
+lines(sp3,col="red")
+lines(sp4,col="green")
+```
+
+To choose smoothness level, one can use cross-validation. This is very easily implemented using the function *smooth.spline*. 
+
+```{r}
+#sp5 <- smooth.spline(d$age,d$indexStart,cv=TRUE)
+sp5 <- smooth.spline(d$age,d$indexStart,cv=F)
+sp5$df
+plot(d$age,d$indexStart,xlim=c(7,20),cex=0.5,pch=20)
+lines(sp5,col="blue")
+```
+
+## Further exercises
+
+- Fit ImprovIndex to age, using the methods explored above.
