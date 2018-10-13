@@ -133,6 +133,12 @@ ggplot(ddd1) +
 
 # save the data:
 save(final_d, file='/Users/alebedev/GitHub/CompModCourse/assignment/data/final_d.rda')
+final_d$stim <- as.numeric(final_d$face)
+final_d$shock <- as.numeric(final_d$shock)*5
+final_d$block <- as.numeric(final_d$block)
+rdata <- final_d[,c('trial','block','stim','shock','gsr')]
+save(rdata, file='/Users/alebedev/GitHub/CompModCourse/assignment/data/rdata.rda')
+
 
 ############
 # ANALYSIS #
@@ -144,15 +150,13 @@ range01 <- function(x){(x-min(x))/(max(x)-min(x))}
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-load('/Users/alebedev/GitHub/CompModCourse/assignment/data/final_d.rda')
-final_d$fix <- as.numeric(final_d$fix)
-final_d$face <- as.numeric(final_d$face)
-final_d$reversal_first <- 0
-final_d$reversal_first[which(final_d$fix==2)+1] <- 1
+#load('/Users/alebedev/GitHub/CompModCourse/assignment/data/final_d.rda')
+load('/Users/alebedev/GitHub/CompModCourse/assignment/data/rdata.rda')
 
-final_d$gsr <- range01(final_d$gsr)
 
-rdata <- rbind(final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d,final_d)
+rdata$gsr <- range01(rdata$gsr)
+
+rdata <- rbind(rdata,rdata,rdata,rdata,rdata,rdata,rdata,rdata,rdata,rdata)
 rdata$subject <- c(rep(1,max(rdata$trial)),
                    rep(2,max(rdata$trial)),
                    rep(3,max(rdata$trial)),
@@ -169,7 +173,7 @@ rdata$subject <- c(rep(1,max(rdata$trial)),
 rdata$gsr <- rdata$gsr+sqrt(rnorm(800,0,0.5)^2)
                    
 
-rdata <- rdata[,c('subject', 'trial', 'gsr', 'face', 'shock', 'cs', 'reversal_first')]
+#rdata <- rdata[,c('subject', 'trial', 'gsr', 'face', 'shock', 'cs', 'reversal_first')]
 # rdata$choice <- 1
 # rdata$choice[rdata$gsr>mean(rdata$gsr)]<-2
 # rdata$gsr <- rdata$choice
